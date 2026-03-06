@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SonicPure — Emitter Placement Optimizer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{
+  --bg:#f0f6ff; --surf:#ffffff; --surf2:#e8f2ff;
+  --brd:#c5d9f0; --brd2:#a8c8e8;
+  --acc:#0070c8; --acc2:#0055a0;
+  --grn:#00a86b; --org:#e05500; --purp:#6a3fac;
+  --txt:#0a1e38; --dim:#4a6a90;
+  --sh:0 1px 4px rgba(0,80,160,.10);
+  --sh2:0 2px 12px rgba(0,80,160,.15);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,sans-serif;display:flex;flex-direction:column;}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:50px;background:var(--acc2);box-shadow:0 2px 8px rgba(0,40,100,.3);flex-shrink:0;z-index:1001;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-mark{width:32px;height:32px;border-radius:7px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 1px 4px rgba(0,0,0,.2);}
+.logo-name{font-family:monospace;font-size:14px;font-weight:700;letter-spacing:.04em;color:#fff;}
+.logo-tag{font-size:9px;color:rgba(255,255,255,.6);font-family:monospace;letter-spacing:.1em;text-transform:uppercase;}
+.hdr-r{display:flex;align-items:center;gap:9px;}
+.hdr-s{display:flex;align-items:center;gap:5px;font-family:monospace;font-size:9px;color:rgba(255,255,255,.8);padding:4px 11px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:20px;max-width:340px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.dot{width:6px;height:6px;border-radius:50%;background:#4ade80;box-shadow:0 0 5px #4ade80;animation:blink 2s infinite;flex-shrink:0;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+#toggleBtn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:5px;color:#fff;font-size:10px;padding:5px 11px;cursor:pointer;font-family:monospace;white-space:nowrap;}
+#toggleBtn:hover{background:rgba(255,255,255,.25);}
+
+/* MAIN */
+.main{display:flex;flex:1;min-height:0;overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{width:245px;flex-shrink:0;background:var(--surf);border-right:1px solid var(--brd);display:flex;flex-direction:column;overflow-y:auto;transition:width .25s,opacity .2s;z-index:1000;box-shadow:2px 0 8px rgba(0,60,140,.07);}
+.sidebar.hidden{width:0;opacity:0;overflow:hidden;border-right:none;pointer-events:none;}
+.sidebar::-webkit-scrollbar{width:4px;}
+.sidebar::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px;}
+.panel{padding:11px 13px;border-bottom:1px solid var(--brd);flex-shrink:0;}
+.sec{font-family:monospace;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--acc);margin-bottom:7px;display:flex;align-items:center;gap:5px;font-weight:700;}
+.sec::after{content:'';flex:1;height:1px;background:var(--brd);}
+.sec.grn{color:var(--grn);} .sec.purp{color:var(--purp);}
+.help{font-size:10px;color:var(--dim);line-height:1.45;margin-bottom:6px;}
+
+/* BUTTONS */
+.btn{width:100%;padding:8px 11px;border-radius:5px;border:1px solid;font-family:monospace;font-size:10px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center;gap:4px;font-weight:600;}
+.btn+.btn{margin-top:5px;}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.b-acc{background:var(--acc);border-color:var(--acc);color:#fff;}
+.b-acc:hover:not(:disabled){background:var(--acc2);}
+.b-grn{background:var(--grn);border-color:var(--grn);color:#fff;}
+.b-grn:hover:not(:disabled){background:#008a58;}
+.b-org{background:var(--org);border-color:var(--org);color:#fff;}
+.b-org:hover:not(:disabled){background:#c04400;}
+.b-purp{background:var(--purp);border-color:var(--purp);color:#fff;}
+.b-purp:hover:not(:disabled){background:#532f88;}
+.b-ghost{background:transparent;border-color:var(--brd2);color:var(--dim);}
+.b-ghost:hover:not(:disabled){border-color:var(--acc);color:var(--acc);}
+
+/* INPUTS */
+.lbl{display:block;font-size:10px;color:var(--dim);margin-bottom:2px;font-weight:600;}
+.irow{display:flex;align-items:center;gap:5px;margin-bottom:7px;}
+.irow:last-child{margin-bottom:0;}
+input[type=number],input[type=text]{background:var(--bg);border:1px solid var(--brd2);border-radius:4px;color:var(--txt);font-family:monospace;font-size:11px;padding:5px 8px;width:100%;outline:none;transition:border-color .15s;}
+input:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(0,112,200,.12);}
+.unit{font-size:9px;color:var(--dim);white-space:nowrap;font-weight:600;}
+.crow{display:flex;align-items:center;gap:5px;margin-bottom:5px;}
+.clbl{font-family:monospace;font-size:9px;color:var(--dim);width:24px;flex-shrink:0;font-weight:700;}
+
+/* SEARCH */
+.search-wrap{position:relative;}
+.search-row{display:flex;gap:5px;}
+.search-row input{flex:1;}
+.sbtn{background:var(--acc);border:none;border-radius:4px;color:#fff;font-family:monospace;font-size:10px;padding:5px 10px;cursor:pointer;white-space:nowrap;font-weight:600;}
+.sbtn:hover{background:var(--acc2);}
+.sdrop{position:absolute;top:100%;left:0;right:0;background:var(--surf);border:1px solid var(--brd);border-radius:5px;box-shadow:var(--sh2);z-index:2000;display:none;max-height:180px;overflow-y:auto;}
+.sdrop.on{display:block;}
+.sitem{padding:7px 10px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--brd);}
+.sitem:last-child{border-bottom:none;}
+.sitem:hover{background:var(--surf2);color:var(--acc);}
+.sitem-name{font-weight:600;}
+.sitem-detail{font-size:9px;color:var(--dim);margin-top:1px;}
+
+/* PROGRESS */
+.prog{display:none;flex-direction:column;gap:4px;padding:8px;background:var(--surf2);border:1px solid var(--brd);border-radius:5px;margin-top:5px;}
+.prog.on{display:flex;}
+.prog-outer{height:5px;background:var(--brd);border-radius:3px;overflow:hidden;}
+.prog-inner{height:100%;background:linear-gradient(90deg,var(--acc),var(--grn));border-radius:3px;transition:width .3s;width:0%;}
+.prog-txt{font-family:monospace;font-size:9px;color:var(--dim);text-align:center;}
+
+/* LEGEND */
+.leg{display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:10px;color:var(--txt);}
+.legc{width:13px;height:13px;border-radius:50%;flex-shrink:0;}
+.leg-toggle{cursor:pointer;padding:3px 5px;border-radius:5px;border:1px solid transparent;transition:all .15s;user-select:none;}
+.leg-toggle:hover{background:var(--surf2);border-color:var(--brd);}
+.leg-toggle.off{opacity:.4;}
+.tog-badge{font-family:monospace;font-size:8px;font-weight:700;padding:2px 5px;border-radius:3px;background:var(--grn);color:#fff;white-space:nowrap;}
+.tog-badge.off-badge{background:var(--brd2);color:var(--dim);}
+
+/* RESULTS */
+.res-sec{display:none;} .res-sec.on{display:block;}
+.rlist{display:flex;flex-direction:column;gap:5px;}
+.rcard{background:var(--surf2);border:1px solid var(--brd);border-radius:5px;padding:7px 9px;cursor:pointer;transition:all .12s;}
+.rcard:hover{border-color:var(--acc);box-shadow:var(--sh);}
+.rcard-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.rcard-id{font-family:monospace;font-size:9px;color:var(--acc);font-weight:700;}
+.rcard-c{font-family:monospace;font-size:8px;color:var(--dim);line-height:1.6;}
+.cp{background:var(--surf);border:1px solid var(--brd2);border-radius:3px;color:var(--dim);font-size:8px;padding:2px 5px;cursor:pointer;font-family:monospace;}
+.cp:hover{border-color:var(--acc);color:var(--acc);}
+.sr{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--brd);font-size:10px;}
+.sr:last-child{border-bottom:none;}
+.sl{color:var(--dim);} .sv{font-family:monospace;font-weight:700;color:var(--acc2);}
+.cvbar{height:3px;background:var(--brd);border-radius:2px;margin-top:3px;overflow:hidden;}
+.cvfill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--acc),var(--grn));transition:width .8s;}
+textarea{width:100%;background:var(--bg);border:1px solid var(--brd);border-radius:4px;color:var(--dim);font-family:monospace;font-size:8px;padding:5px;resize:none;outline:none;line-height:1.5;}
+.ilist{display:flex;flex-direction:column;gap:3px;margin-top:5px;}
+.iitem{display:flex;align-items:center;justify-content:space-between;background:var(--surf2);border:1px solid var(--brd);border-radius:4px;padding:3px 8px;font-family:monospace;font-size:9px;color:var(--purp);}
+.delbtn{background:transparent;border:none;color:var(--org);cursor:pointer;font-size:12px;line-height:1;}
+#ptcount{margin-top:4px;font-family:monospace;font-size:9px;color:var(--dim);text-align:center;}
+
+/* MAP AREA */
+#mapwrap{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden;}
+#leafmap{width:100%;height:100%;position:absolute;top:0;left:0;}
+/* canvas sits on top of leaflet for drawing + signal */
+#cvs{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:500;}
+/* drawing mode — canvas receives clicks */
+#cvs.drawing{pointer-events:all;cursor:crosshair;}
+
+/* leaflet overrides */
+.leaflet-container{background:#a8d4f0;}
+.leaflet-control-zoom a{background:var(--surf)!important;color:var(--acc)!important;border-color:var(--brd)!important;font-weight:700;}
+.leaflet-control-zoom a:hover{background:var(--acc)!important;color:#fff!important;}
+.leaflet-control-scale-line{background:rgba(255,255,255,.92)!important;border:2px solid var(--acc)!important;border-top:none!important;color:var(--acc2)!important;font-family:monospace!important;font-size:10px!important;font-weight:700!important;padding:2px 6px!important;box-shadow:var(--sh)!important;}
+
+/* map banners */
+.mbanner{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.97);border:2px solid;border-radius:20px;padding:6px 18px;font-family:monospace;font-size:10px;z-index:600;pointer-events:none;white-space:nowrap;box-shadow:var(--sh2);font-weight:700;display:none;}
+.mbanner.on{display:block;}
+.mb-draw{border-color:var(--acc);color:var(--acc);}
+.mb-isle{border-color:var(--purp);color:var(--purp);}
+.mhint{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.93);border:1px solid var(--brd);border-radius:20px;padding:6px 16px;font-family:monospace;font-size:9px;color:var(--dim);z-index:600;pointer-events:none;white-space:nowrap;box-shadow:var(--sh);transition:opacity .3s;}
+#coordTip{position:absolute;bottom:8px;right:10px;background:rgba(255,255,255,.9);border:1px solid var(--brd);border-radius:4px;padding:3px 8px;font-family:monospace;font-size:8px;color:var(--dim);z-index:600;pointer-events:none;box-shadow:var(--sh);}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-mark">🌊</div>
+    <div><div class="logo-name">SonicPure</div><div class="logo-tag">Emitter Placement Optimizer</div></div>
+  </div>
+  <div class="hdr-r">
+    <button id="toggleBtn">☰ Panel</button>
+    <div class="hdr-s"><div class="dot"></div><span id="statusText">READY</span></div>
+  </div>
+</header>
+
+<div class="main">
+<div class="sidebar" id="sidebar">
+
+  <!-- 0 SEARCH -->
+  <div class="panel">
+    <div class="sec">0 · Find Location</div>
+    <div class="help">Search for your lake, reservoir or pond by name.</div>
+    <div class="search-wrap">
+      <div class="search-row">
+        <input type="text" id="searchInput" placeholder="e.g. Lake Tahoe, California">
+        <button class="sbtn" id="btnSearch">Go</button>
+      </div>
+      <div class="sdrop" id="sdrop"></div>
+    </div>
+  </div>
+
+  <!-- 1 BOUNDARY -->
+  <div class="panel">
+    <div class="sec">1 · Lake Boundary</div>
+    <button class="btn b-acc"   id="btnDraw">✏️ Draw Lake Boundary</button>
+    <button class="btn b-ghost" id="btnUndo"  disabled>↩ Undo Point</button>
+    <button class="btn b-grn"   id="btnClose" disabled>⬡ Close Polygon</button>
+    <button class="btn b-org"   id="btnClear" disabled>✕ Clear All</button>
+    <div id="ptcount"></div>
+    <div id="lakeAreaDisplay" style="display:none;margin-top:6px;padding:5px 8px;background:var(--surf2);border:1px solid var(--brd);border-radius:4px;font-family:monospace;font-size:10px;color:var(--acc2);text-align:center;font-weight:700;"></div>
+  </div>
+
+  <!-- 2 ISLANDS -->
+  <div class="panel">
+    <div class="sec purp">2 · Islands / Obstacles</div>
+    <div class="help">Trace land masses — signal will not pass through them.</div>
+    <button class="btn b-purp"  id="btnIsland"    disabled>🏝 Add Island</button>
+    <button class="btn b-ghost" id="btnIsleUndo"  disabled>↩ Undo Point</button>
+    <button class="btn b-purp"  id="btnIsleClose" disabled>⬡ Close Island</button>
+    <div class="ilist" id="ilist"></div>
+  </div>
+
+  <!-- 3 CONFIG -->
+  <div class="panel">
+    <div class="sec">3 · Device Config</div>
+    <label class="lbl">Number of Emitters</label>
+    <div class="irow"><input type="number" id="numDev" value="4" min="1" max="20"><span class="unit">units</span></div>
+    <label class="lbl">Biofilm Radius</label>
+    <div class="irow"><input type="number" id="rBf" value="100" min="10"><span class="unit">m</span></div>
+    <label class="lbl">Algae Radius</label>
+    <div class="irow"><input type="number" id="rAl" value="400" min="10"><span class="unit">m</span></div>
+    <label class="lbl" style="margin-top:4px;">Units</label>
+    <div class="irow" style="margin-bottom:0">
+      <select id="unitToggle" style="background:var(--bg);border:1px solid var(--brd2);border-radius:4px;color:var(--txt);font-family:monospace;font-size:11px;padding:5px 8px;width:100%;outline:none;">
+        <option value="metric">Metric (m², ha, km²)</option>
+        <option value="us">US (ft², acres, mi²)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 4 OPTIMIZE -->
+  <div class="panel">
+    <div class="sec">4 · Optimize</div>
+    <button class="btn b-grn" id="btnOpt" disabled>⚡ Run Optimization</button>
+    <div class="prog" id="prog">
+      <div class="prog-txt" id="progTxt">…</div>
+      <div class="prog-outer"><div class="prog-inner" id="progBar"></div></div>
+    </div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="panel">
+    <div class="sec">Legend <span style="font-size:8px;color:var(--dim);font-family:system-ui;text-transform:none;letter-spacing:0;font-weight:400;">— click zones to toggle</span></div>
+    <div class="leg leg-toggle" id="togAlgae">
+      <div class="legc" style="background:rgba(0,112,200,.12);border:2px dashed rgba(0,112,200,.5);flex-shrink:0;"></div>
+      <span style="flex:1;">Algae treatment zone</span>
+      <span class="tog-badge" id="badgeAlgae">ON</span>
+    </div>
+    <div class="leg leg-toggle" id="togBiofilm">
+      <div class="legc" style="background:rgba(0,168,107,.2);border:2px solid rgba(0,168,107,.6);flex-shrink:0;"></div>
+      <span style="flex:1;">Biofilm treatment zone</span>
+      <span class="tog-badge" id="badgeBiofilm">ON</span>
+    </div>
+    <div class="leg"><div class="legc" style="background:rgba(106,63,172,.18);border:2px solid rgba(106,63,172,.6);flex-shrink:0;"></div>Island / obstacle</div>
+    <div class="leg"><div style="width:16px;height:3px;background:var(--org);border-radius:2px;flex-shrink:0;"></div>Lake boundary</div>
+    <div class="leg" style="margin-top:4px;padding-top:6px;border-top:1px solid var(--brd);font-size:9px;color:var(--dim);">
+      💡 Drag emitter markers to reposition
+    </div>
+  </div>
+
+  <!-- 5 RESULTS -->
+  <div class="panel res-sec" id="resPanel">
+    <div class="sec grn">5 · Results</div>
+    <div id="statsBlock" style="margin-bottom:8px;"></div>
+    <div class="rlist" id="rlist"></div>
+    <button class="btn b-ghost" style="margin-top:8px;" id="btnExp">↓ Export GPS Coordinates (CSV)</button>
+    <div style="margin-top:6px;"><label class="lbl">Coordinates (copy-paste)</label><textarea id="coordsTa" rows="4" readonly></textarea></div>
+  </div>
+
+</div><!-- /sidebar -->
+
+<!-- MAP -->
+<div id="mapwrap">
+  <div id="leafmap"></div>
+  <canvas id="cvs"></canvas>
+  <div class="mbanner mb-draw" id="banDraw">✏️ DRAWING LAKE — click shoreline to place points · double-click to finish</div>
+  <div class="mbanner mb-isle" id="banIsle">🏝 DRAWING ISLAND — click to place points · double-click to finish</div>
+  <div class="mhint" id="mhint">Search for your lake above, or pan/zoom the map, then click "Draw Lake Boundary"</div>
+  <div id="coordTip">—</div>
+</div>
+</div><!-- /main -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+'use strict';
+
+var R = 6371000;
+
+/* ── LEAFLET MAP ─────────────────────────────────────────────────────────── */
+var lmap = L.map('leafmap', { center:[45.0,-93.0], zoom:13, zoomControl:true });
+
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+  maxZoom:19,
+  crossOrigin:true
+}).addTo(lmap);
+
+/* ── CANVAS OVERLAY ──────────────────────────────────────────────────────── */
+var cvs = document.getElementById('cvs');
+var ctx = cvs.getContext('2d');
+
+function resizeCvs() {
+  var wrap = document.getElementById('mapwrap');
+  cvs.width  = wrap.offsetWidth;
+  cvs.height = wrap.offsetHeight;
+  renderOverlay();
+}
+window.addEventListener('resize', function(){ setTimeout(resizeCvs,50); });
+lmap.on('move zoom moveend zoomend', renderOverlay);
+// after sidebar toggle
+document.getElementById('toggleBtn').addEventListener('click', function(){
+  document.getElementById('sidebar').classList.toggle('hidden');
+  setTimeout(function(){ lmap.invalidateSize(); resizeCvs(); }, 280);
+});
+
+/* ── STATE ────────────────────────────────────────────────────────────────── */
+var mode = 'none'; // 'lake' | 'island' | 'none'
+var lakePts = [], lakeDone = false;
+var islands = [], curIsle = null;
+var optDevs = [], sigImg = null;
+var showBiofilm = true, showAlgae = true;
+var dragIdx = -1, dragStartGeo = null;
+
+/* ── GEO ↔ PIXEL (via Leaflet) ───────────────────────────────────────────── */
+function geoToPx(lat, lng) {
+  var pt = lmap.latLngToContainerPoint(L.latLng(lat, lng));
+  return [pt.x, pt.y];
+}
+function pxToGeo(x, y) {
+  var ll = lmap.containerPointToLatLng([x, y]);
+  return [ll.lat, ll.lng];
+}
+
+/* ── RENDER OVERLAY ──────────────────────────────────────────────────────── */
+function renderOverlay() {
+  if (!cvs.width || !cvs.height) return;
+  ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+  // Treatment zone circles (drawn before lake border so border is on top)
+  if (optDevs.length && lakeDone) drawZoneCircles();
+
+  drawIslands();
+  if (lakeDone && lakePts.length) drawLakeBorder();
+  else if (lakePts.length > 1)   drawDashedPoly(lakePts, '#e05500');
+  if (!lakeDone) drawDots(lakePts, '#e05500');
+  if (curIsle && curIsle.pts.length > 0) {
+    drawDashedPoly(curIsle.pts, '#6a3fac');
+    drawDots(curIsle.pts, '#6a3fac');
+  }
+  if (optDevs.length) drawDevices();
+}
+
+function tracePoly(pts) {
+  if (!pts.length) return;
+  var p0 = geoToPx(pts[0][0], pts[0][1]);
+  ctx.moveTo(p0[0], p0[1]);
+  for (var i = 1; i < pts.length; i++) {
+    var p = geoToPx(pts[i][0], pts[i][1]);
+    ctx.lineTo(p[0], p[1]);
+  }
+}
+
+function drawLakeBorder() {
+  ctx.beginPath(); tracePoly(lakePts); ctx.closePath();
+  ctx.strokeStyle = '#e05500'; ctx.lineWidth = 2.5; ctx.stroke();
+}
+
+function drawDashedPoly(pts, col) {
+  if (pts.length < 2) return;
+  ctx.beginPath(); tracePoly(pts);
+  ctx.strokeStyle = col; ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
+}
+
+function drawDots(pts, col) {
+  for (var i = 0; i < pts.length; i++) {
+    var p = geoToPx(pts[i][0], pts[i][1]);
+    ctx.beginPath(); ctx.arc(p[0], p[1], 5, 0, Math.PI*2);
+    ctx.fillStyle = col; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+}
+
+function drawIslands() {
+  for (var k = 0; k < islands.length; k++) {
+    var isl = islands[k];
+    if (!isl.closed || isl.pts.length < 3) continue;
+    ctx.beginPath(); tracePoly(isl.pts); ctx.closePath();
+    ctx.fillStyle = 'rgba(106,63,172,0.15)'; ctx.fill();
+    ctx.strokeStyle = '#6a3fac'; ctx.lineWidth = 2; ctx.stroke();
+  }
+}
+
+/* ── ZONE CIRCLES ─────────────────────────────────────────────────────────
+   Draws clipped semitransparent circles for each device.
+   Algae zone (outer, blue dashed), Biofilm zone (inner, green solid).
+   Each is clipped to the lake polygon minus islands using evenodd.
+──────────────────────────────────────────────────────────────────────────── */
+function metersToPixels(metres) {
+  // Use Leaflet's projection to get pixel radius at current zoom
+  var centre = lmap.getCenter();
+  var p1 = lmap.latLngToContainerPoint(centre);
+  var p2 = lmap.latLngToContainerPoint(
+    L.latLng(centre.lat + (metres / R) * (180/Math.PI), centre.lng)
+  );
+  return Math.abs(p2.y - p1.y);
+}
+
+function setLakeClip() {
+  ctx.beginPath();
+  tracePoly(lakePts); ctx.closePath();
+  for (var k = 0; k < islands.length; k++) {
+    if (!islands[k].closed || islands[k].pts.length < 3) continue;
+    tracePoly(islands[k].pts); ctx.closePath();
+  }
+  ctx.clip('evenodd');
+}
+
+function drawZoneCircles() {
+  var rAl = parseFloat(document.getElementById('rAl').value) || 400;
+  var rBf = parseFloat(document.getElementById('rBf').value) || 100;
+  var rAlPx = metersToPixels(rAl);
+  var rBfPx = metersToPixels(rBf);
+
+  // Draw algae zones first (larger, behind)
+  if (showAlgae) {
+    ctx.save();
+    setLakeClip();
+    for (var i = 0; i < optDevs.length; i++) {
+      var p = geoToPx(optDevs[i][0], optDevs[i][1]);
+      ctx.beginPath(); ctx.arc(p[0], p[1], rAlPx, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(0,112,200,0.13)'; ctx.fill();
+    }
+    ctx.restore();
+    // Dashed outline (not clipped, so it draws over lake border — fine)
+    for (var i = 0; i < optDevs.length; i++) {
+      var p = geoToPx(optDevs[i][0], optDevs[i][1]);
+      ctx.beginPath(); ctx.arc(p[0], p[1], rAlPx, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(0,112,200,0.7)'; ctx.lineWidth = 2;
+      ctx.setLineDash([8, 5]); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+
+  // Draw biofilm zones (smaller, on top)
+  if (showBiofilm) {
+    ctx.save();
+    setLakeClip();
+    for (var i = 0; i < optDevs.length; i++) {
+      var p = geoToPx(optDevs[i][0], optDevs[i][1]);
+      ctx.beginPath(); ctx.arc(p[0], p[1], rBfPx, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(0,168,107,0.22)'; ctx.fill();
+    }
+    ctx.restore();
+    for (var i = 0; i < optDevs.length; i++) {
+      var p = geoToPx(optDevs[i][0], optDevs[i][1]);
+      ctx.beginPath(); ctx.arc(p[0], p[1], rBfPx, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(0,168,107,0.85)'; ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+}
+
+function drawDevices() {
+  var isDragging = dragIdx >= 0;
+  for (var i = 0; i < optDevs.length; i++) {
+    var p = geoToPx(optDevs[i][0], optDevs[i][1]);
+    var isActive = (dragIdx === i);
+    // outer glow
+    var grd = ctx.createRadialGradient(p[0],p[1],3,p[0],p[1],isActive?22:16);
+    grd.addColorStop(0, isActive ? 'rgba(0,168,107,.5)' : 'rgba(0,112,200,.3)');
+    grd.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(p[0],p[1],isActive?22:16,0,Math.PI*2);
+    ctx.fillStyle=grd; ctx.fill();
+    // white ring
+    ctx.beginPath(); ctx.arc(p[0],p[1],11,0,Math.PI*2);
+    ctx.fillStyle= isActive ? '#e8fff5' : '#fff'; ctx.fill();
+    ctx.strokeStyle= isActive ? '#00a86b' : '#0070c8';
+    ctx.lineWidth=3; ctx.stroke();
+    // inner dot
+    ctx.beginPath(); ctx.arc(p[0],p[1],5,0,Math.PI*2);
+    ctx.fillStyle= isActive ? '#00a86b' : '#0070c8'; ctx.fill();
+    // number
+    ctx.fillStyle='#fff'; ctx.font='bold 7px monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(i+1, p[0], p[1]);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    // drag handle hint (small arrows around marker)
+    if (!isDragging && mode==='none' && optDevs.length) {
+      ctx.fillStyle='rgba(0,80,160,0.25)';
+      ctx.font='9px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('⤢', p[0]+14, p[1]-14);
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    }
+  }
+}
+
+/* ── SIGNAL MAP (unused now — replaced by circles, kept for future use) ── */
+function buildSigMap() { sigImg = null; } // no-op, circles handle display
+function drawSigMap() {}
+
+/* ── GEOMETRY ─────────────────────────────────────────────────────────────── */
+function toM(lat,lng,rl,rg){return[(lat-rl)*Math.PI/180*R,(lng-rg)*Math.PI/180*R*Math.cos(rl*Math.PI/180)];}
+function fromM(my,mx,rl,rg){return[rl+my/R*180/Math.PI,rg+mx/R*180/Math.PI/Math.cos(rl*Math.PI/180)];}
+function cen(p){var n=p.length;return[p.reduce(function(s,x){return s+x[0];},0)/n,p.reduce(function(s,x){return s+x[1];},0)/n];}
+function pip(lat,lng,poly){
+  var ins=false;
+  for(var i=0,j=poly.length-1;i<poly.length;j=i++){
+    var xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1];
+    if(((yi>lng)!==(yj>lng))&&(lat<(xj-xi)*(lng-yi)/(yj-yi)+xi))ins=!ins;
+  }
+  return ins;
+}
+function hDist(a,b){
+  var dLat=(b[0]-a[0])*Math.PI/180,dLng=(b[1]-a[1])*Math.PI/180;
+  var h=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.asin(Math.sqrt(h));
+}
+function segX(a,b,c,d){
+  var den=(b[0]-a[0])*(d[1]-c[1])-(b[1]-a[1])*(d[0]-c[0]);
+  if(Math.abs(den)<1e-12)return false;
+  var t=((c[0]-a[0])*(d[1]-c[1])-(c[1]-a[1])*(d[0]-c[0]))/den;
+  var u=((c[0]-a[0])*(b[1]-a[1])-(c[1]-a[1])*(b[0]-a[0]))/den;
+  return t>0.01&&t<0.99&&u>0.01&&u<0.99;
+}
+function rayBlocked(ga,gb){
+  for(var k=0;k<islands.length;k++){
+    var isl=islands[k];if(!isl.closed||isl.pts.length<3)continue;
+    for(var i=0,j=isl.pts.length-1;i<isl.pts.length;j=i++){
+      if(segX(ga,gb,isl.pts[j],isl.pts[i]))return true;
+    }
+  }
+  return false;
+}
+function polyArea(p){
+  var rf=cen(p),m=p.map(function(x){return toM(x[0],x[1],rf[0],rf[1]);}),a=0;
+  for(var i=0,j=m.length-1;i<m.length;j=i++)a+=(m[j][0]+m[i][0])*(m[j][1]-m[i][1]);
+  return Math.abs(a)/2;
+}
+function getBB(p){return{s:Math.min.apply(null,p.map(function(x){return x[0];})),n:Math.max.apply(null,p.map(function(x){return x[0];})),w:Math.min.apply(null,p.map(function(x){return x[1];})),e:Math.max.apply(null,p.map(function(x){return x[1];}))};}
+function sampleIn(n){
+  var b=getBB(lakePts),out=[],tries=0;
+  while(out.length<n&&tries<n*80){
+    tries++;
+    var lat=b.s+Math.random()*(b.n-b.s),lng=b.w+Math.random()*(b.e-b.w);
+    if(!pip(lat,lng,lakePts))continue;
+    var ok=true;
+    for(var k=0;k<islands.length;k++){if(islands[k].closed&&pip(lat,lng,islands[k].pts)){ok=false;break;}}
+    if(ok)out.push([lat,lng]);
+  }
+  return out;
+}
+function covPct(devs,samp,r){
+  var rf=cen(lakePts),c=0;
+  for(var si=0;si<samp.length;si++){
+    var sm=toM(samp[si][0],samp[si][1],rf[0],rf[1]);
+    for(var di=0;di<devs.length;di++){
+      var dm=toM(devs[di][0],devs[di][1],rf[0],rf[1]);
+      if((sm[0]-dm[0])*(sm[0]-dm[0])+(sm[1]-dm[1])*(sm[1]-dm[1])<=r*r){c++;break;}
+    }
+  }
+  return c/samp.length;
+}
+function initDiv(n,samp){
+  if(!n||!samp.length)return[];
+  var ch=[samp[Math.floor(Math.random()*samp.length)]];
+  while(ch.length<n){
+    var bd=-1,bp=null;
+    for(var i=0;i<samp.length;i++){
+      var md=Infinity;
+      for(var j=0;j<ch.length;j++){var dd=hDist(samp[i],ch[j]);if(dd<md)md=dd;}
+      if(md>bd){bd=md;bp=samp[i];}
+    }
+    ch.push(bp);
+  }
+  return ch;
+}
+
+/* ── SEARCH (Nominatim) ──────────────────────────────────────────────────── */
+var searchInput = document.getElementById('searchInput');
+var sdrop = document.getElementById('sdrop');
+
+document.getElementById('btnSearch').addEventListener('click', doSearch);
+searchInput.addEventListener('keydown', function(e){ if(e.key==='Enter') doSearch(); });
+
+function doSearch(){
+  var q = searchInput.value.trim();
+  if (!q) return;
+  sdrop.innerHTML = '<div class="sitem" style="color:var(--dim)">Searching…</div>';
+  sdrop.classList.add('on');
+  setStatus('Searching for "'+q+'"…');
+  fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&q='+encodeURIComponent(q),
+    {headers:{'Accept-Language':'en','User-Agent':'SonicPure-Optimizer/1.0'}})
+  .then(function(r){return r.json();})
+  .then(function(data){
+    sdrop.innerHTML='';
+    if(!data.length){
+      sdrop.innerHTML='<div class="sitem" style="color:var(--org)">No results found</div>';
+      setStatus('No results — try a different name');
+      return;
+    }
+    data.forEach(function(item){
+      var el=document.createElement('div'); el.className='sitem';
+      var parts=item.display_name.split(',');
+      el.innerHTML='<div class="sitem-name">'+parts[0]+'</div>'+
+        '<div class="sitem-detail">'+parts.slice(1,3).join(',')+' </div>';
+      el.addEventListener('click',function(){
+        sdrop.classList.remove('on');
+        searchInput.value=parts[0];
+        if(item.boundingbox){
+          var bb=item.boundingbox;
+          lmap.fitBounds([[+bb[0],+bb[2]],[+bb[1],+bb[3]]],{padding:[30,30]});
+        } else {
+          lmap.setView([+item.lat,+item.lon],14);
+        }
+        setStatus('Navigated to '+parts[0]+' — now draw the lake boundary');
+        document.getElementById('mhint').style.opacity='0';
+      });
+      sdrop.appendChild(el);
+    });
+    setStatus('Select a result');
+  })
+  .catch(function(){
+    sdrop.innerHTML='<div class="sitem" style="color:var(--org)">Search requires internet connection</div>';
+    setStatus('Search failed — check internet connection');
+  });
+}
+
+// close dropdown on map click
+lmap.on('click', function(){ sdrop.classList.remove('on'); });
+
+/* ── MAP INTERACTION: COORD TIP + DEVICE DRAGGING ───────────────────────── */
+var DRAG_HIT_PX = 14; // pixels radius to initiate drag
+
+function getDeviceAtPx(cx, cy) {
+  for (var i = 0; i < optDevs.length; i++) {
+    var p = geoToPx(optDevs[i][0], optDevs[i][1]);
+    var dx = p[0]-cx, dy = p[1]-cy;
+    if (Math.sqrt(dx*dx+dy*dy) <= DRAG_HIT_PX) return i;
+  }
+  return -1;
+}
+
+document.getElementById('mapwrap').addEventListener('mousemove', function(e){
+  var r = cvs.getBoundingClientRect();
+  var cx = e.clientX-r.left, cy = e.clientY-r.top;
+  var geo = pxToGeo(cx, cy);
+  document.getElementById('coordTip').textContent = geo[0].toFixed(5)+'°,  '+geo[1].toFixed(5)+'°';
+
+  if (dragIdx >= 0) {
+    // actively dragging a device
+    optDevs[dragIdx] = [geo[0], geo[1]];
+    renderOverlay();
+    return;
+  }
+
+  // Cursor feedback: show move cursor when hovering a device
+  if (mode === 'none' && optDevs.length) {
+    var hit = getDeviceAtPx(cx, cy);
+    document.getElementById('leafmap').style.cursor = hit >= 0 ? 'grab' : '';
+  }
+});
+
+document.getElementById('mapwrap').addEventListener('mousedown', function(e){
+  if (mode !== 'none') return;
+  var r = cvs.getBoundingClientRect();
+  var cx = e.clientX-r.left, cy = e.clientY-r.top;
+  var hit = getDeviceAtPx(cx, cy);
+  if (hit >= 0) {
+    dragIdx = hit;
+    dragStartGeo = [optDevs[hit][0], optDevs[hit][1]];
+    lmap.dragging.disable();
+    document.getElementById('leafmap').style.cursor = 'grabbing';
+    e.stopPropagation();
+  }
+});
+
+window.addEventListener('mouseup', function(e){
+  if (dragIdx >= 0) {
+    var r = cvs.getBoundingClientRect();
+    var cx = e.clientX-r.left, cy = e.clientY-r.top;
+    var geo = pxToGeo(cx, cy);
+
+    // Validate: must be inside lake and not inside island
+    var valid = pip(geo[0], geo[1], lakePts);
+    if (valid) {
+      for (var k=0; k<islands.length; k++) {
+        if (islands[k].closed && pip(geo[0], geo[1], islands[k].pts)) { valid=false; break; }
+      }
+    }
+    if (!valid) {
+      // Snap back to original
+      optDevs[dragIdx] = dragStartGeo;
+      setStatus('Device must be placed inside the lake boundary');
+    } else {
+      // Recalculate coverage
+      recalcCoverage();
+    }
+    dragIdx = -1;
+    dragStartGeo = null;
+    lmap.dragging.enable();
+    document.getElementById('leafmap').style.cursor = '';
+    renderOverlay();
+  }
+});
+
+function recalcCoverage() {
+  if (!optDevs.length || !lakeDone) return;
+  var rBfV = parseFloat(document.getElementById('rBf').value)||100;
+  var rAlV = parseFloat(document.getElementById('rAl').value)||400;
+  var samp = sampleIn(800); // lighter sample for instant feedback
+  if (!samp.length) return;
+  var cA = covPct(optDevs, samp, rAlV)*100;
+  var cB = covPct(optDevs, samp, rBfV)*100;
+  var area = polyArea(lakePts);
+  setStatus('Updated — algae '+cA.toFixed(1)+'% · biofilm '+cB.toFixed(1)+'%');
+  // Update results panel if visible
+  var panel = document.getElementById('resPanel');
+  if (panel.classList.contains('on')) showResults(optDevs, cA, cB, area);
+}
+
+// Leaflet click handler for drawing
+lmap.on('click', function(e){
+  if (mode === 'none') return;
+  if (dragIdx >= 0) return; // ignore clicks during drag
+  var geo = [e.latlng.lat, e.latlng.lng];
+  if (mode === 'lake') {
+    lakePts.push(geo);
+    document.getElementById('ptcount').textContent = lakePts.length+' points placed';
+    if (lakePts.length >= 3) document.getElementById('btnClose').disabled = false;
+    setStatus('Drawing lake — '+lakePts.length+' points');
+  } else if (mode === 'island' && curIsle) {
+    curIsle.pts.push(geo);
+    if (curIsle.pts.length >= 3) document.getElementById('btnIsleClose').disabled = false;
+    setStatus('Drawing island — '+curIsle.pts.length+' points');
+  }
+  renderOverlay();
+});
+
+lmap.on('dblclick', function(e){
+  L.DomEvent.stopPropagation(e);
+  if (mode === 'lake' && lakePts.length >= 3) { lakePts.pop(); closeLake(); }
+  else if (mode === 'island' && curIsle && curIsle.pts.length >= 3) { curIsle.pts.pop(); closeIsland(); }
+});
+
+/* ── CONTROLS ─────────────────────────────────────────────────────────────── */
+document.getElementById('btnDraw').addEventListener('click', function(){
+  clearAll();
+  mode = 'lake';
+  lmap.dragging.disable();
+  document.getElementById('banDraw').classList.add('on');
+  document.getElementById('mhint').style.opacity = '0';
+  document.getElementById('btnDraw').disabled = true;
+  document.getElementById('btnUndo').disabled = false;
+  document.getElementById('leafmap').style.cursor = 'crosshair';
+  setStatus('Drawing lake — click along the shoreline');
+});
+
+document.getElementById('btnUndo').addEventListener('click', function(){
+  if (!lakePts.length) return;
+  lakePts.pop();
+  document.getElementById('ptcount').textContent = lakePts.length ? lakePts.length+' points placed' : '';
+  if (lakePts.length < 3) document.getElementById('btnClose').disabled = true;
+  renderOverlay();
+});
+
+document.getElementById('btnClose').addEventListener('click', closeLake);
+document.getElementById('btnClear').addEventListener('click', clearAll);
+
+function closeLake(){
+  if (lakePts.length < 3) return;
+  mode='none'; lakeDone=true;
+  lmap.dragging.enable();
+  document.getElementById('banDraw').classList.remove('on');
+  document.getElementById('leafmap').style.cursor = '';
+  document.getElementById('btnClose').disabled=true;
+  document.getElementById('btnUndo').disabled=true;
+  document.getElementById('btnOpt').disabled=false;
+  document.getElementById('btnClear').disabled=false;
+  document.getElementById('btnIsland').disabled=false;
+  var area = polyArea(lakePts);
+  var areaEl = document.getElementById('lakeAreaDisplay');
+  areaEl.style.display='block';
+  areaEl.dataset.m2 = area;
+  areaEl.textContent = '📐 Lake area: ' + formatArea(area);
+  setStatus('Boundary set — '+formatArea(area)+' · ready to optimize');
+  renderOverlay();
+}
+
+function clearAll(){
+  mode='none'; lakeDone=false; lakePts=[]; islands=[]; curIsle=null;
+  optDevs=[]; sigImg=null;
+  lmap.dragging.enable();
+  document.getElementById('leafmap').style.cursor='';
+  document.getElementById('btnDraw').disabled=false;
+  ['btnUndo','btnClose','btnOpt','btnClear','btnIsland','btnIsleUndo','btnIsleClose'].forEach(function(id){
+    document.getElementById(id).disabled=true;
+  });
+  document.getElementById('ptcount').textContent='';
+  document.getElementById('lakeAreaDisplay').style.display='none';
+  document.getElementById('ilist').innerHTML='';
+  document.getElementById('resPanel').classList.remove('on');
+  document.getElementById('prog').classList.remove('on');
+  document.getElementById('banDraw').classList.remove('on');
+  document.getElementById('banIsle').classList.remove('on');
+  setStatus('READY');
+  renderOverlay();
+}
+
+document.getElementById('btnIsland').addEventListener('click', function(){
+  if (!lakeDone) return;
+  mode='island'; curIsle={pts:[],closed:false};
+  lmap.dragging.disable();
+  document.getElementById('banIsle').classList.add('on');
+  document.getElementById('btnIsleUndo').disabled=false;
+  document.getElementById('btnIsland').disabled=true;
+  document.getElementById('leafmap').style.cursor='crosshair';
+  setStatus('Drawing island — click to trace outline');
+});
+document.getElementById('btnIsleUndo').addEventListener('click', function(){
+  if (!curIsle||!curIsle.pts.length) return;
+  curIsle.pts.pop();
+  if (curIsle.pts.length<3) document.getElementById('btnIsleClose').disabled=true;
+  renderOverlay();
+});
+document.getElementById('btnIsleClose').addEventListener('click', closeIsland);
+
+function closeIsland(){
+  if (!curIsle||curIsle.pts.length<3) return;
+  curIsle.closed=true; islands.push(curIsle);
+  rebuildIslandList(); curIsle=null; mode='none';
+  lmap.dragging.enable();
+  document.getElementById('banIsle').classList.remove('on');
+  document.getElementById('leafmap').style.cursor='';
+  document.getElementById('btnIsleUndo').disabled=true;
+  document.getElementById('btnIsleClose').disabled=true;
+  document.getElementById('btnIsland').disabled=false;
+  sigImg=null;
+  setStatus('Island added — add more or run optimization');
+  renderOverlay();
+}
+
+function rebuildIslandList(){
+  var el=document.getElementById('ilist'); el.innerHTML='';
+  islands.forEach(function(isl,k){
+    var li=document.createElement('div'); li.className='iitem';
+    li.innerHTML='🏝 Island '+(k+1)+'<button class="delbtn" data-k="'+k+'">✕</button>';
+    li.querySelector('.delbtn').addEventListener('click',function(){
+      islands.splice(+this.getAttribute('data-k'),1);
+      sigImg=null; rebuildIslandList(); renderOverlay();
+    });
+    el.appendChild(li);
+  });
+}
+
+/* ── SHORE DISTANCE ───────────────────────────────────────────────────────────
+   For each sample point compute its minimum distance to any polygon edge
+   (lake boundary + island edges). Used to:
+   1. Bias initDiv toward medial-axis (deepest) points
+   2. Penalise placements that are too close to shore
+──────────────────────────────────────────────────────────────────────────── */
+function ptSegDist(p, a, b) {
+  // distance from point p to segment a-b, in metres (flat-earth approx)
+  var rf = a;
+  var pm = toM(p[0],p[1],rf[0],rf[1]);
+  var am = [0,0];
+  var bm = toM(b[0],b[1],rf[0],rf[1]);
+  var dx = bm[0]-am[0], dy = bm[1]-am[1];
+  var lenSq = dx*dx+dy*dy;
+  var t = lenSq>0 ? Math.max(0,Math.min(1,(pm[0]*dx+pm[1]*dy)/lenSq)) : 0;
+  var nx = pm[0]-t*dx, ny = pm[1]-t*dy;
+  return Math.sqrt(nx*nx+ny*ny);
+}
+
+function shoreDistM(pt) {
+  // min distance from pt to any edge of lake polygon or island polygons
+  var minD = Infinity;
+  var polys = [lakePts];
+  islands.forEach(function(isl){ if(isl.closed) polys.push(isl.pts); });
+  for (var pi=0; pi<polys.length; pi++) {
+    var poly = polys[pi];
+    for (var i=0,j=poly.length-1; i<poly.length; j=i++) {
+      var d = ptSegDist(pt, poly[j], poly[i]);
+      if (d < minD) minD = d;
+    }
+  }
+  return minD;
+}
+
+/* ── OPTIMIZED SCORING ────────────────────────────────────────────────────────
+   Score = coverage% + alpha * mean_shore_dist_of_devices
+   alpha gradually decreases from 0.4 → 0 so early iterations push devices
+   toward the centre, later iterations fine-tune pure coverage.
+──────────────────────────────────────────────────────────────────────────── */
+function score(devs, samp, r, alpha, maxShoreD) {
+  var cov = covPct(devs, samp, r);
+  if (alpha <= 0) return cov;
+  // normalised mean shore distance of device positions (0–1)
+  var sd = 0;
+  for (var i=0; i<devs.length; i++) sd += shoreDistM(devs[i]);
+  sd /= (devs.length * (maxShoreD||1));
+  return cov + alpha * Math.min(sd, 1.0);
+}
+
+/* ── INIT USING MEDIAL-AXIS BIAS ─────────────────────────────────────────────
+   Pick initial positions from the pool of sample points weighted by their
+   shore distance, then spread them with farthest-first.
+──────────────────────────────────────────────────────────────────────────── */
+function initDivWeighted(n, samp, shoreDists) {
+  if (!n || !samp.length) return [];
+  // Build weighted pool: duplicate entries proportional to shore dist
+  // so random picks are biased toward the medial axis
+  var maxD = Math.max.apply(null, shoreDists);
+  if (maxD <= 0) return samp.slice(0, Math.min(n, samp.length));
+
+  // Weighted random pick of first seed
+  var wsum = 0;
+  var weights = shoreDists.map(function(d){ var w=d/maxD; wsum+=w; return w; });
+  var pick = Math.random()*wsum, acc=0, firstIdx=0;
+  for (var i=0; i<weights.length; i++) { acc+=weights[i]; if(acc>=pick){firstIdx=i;break;} }
+
+  var chosen = [samp[firstIdx]];
+  // Farthest-first for remaining, but distance metric biased toward deep points
+  while (chosen.length < n) {
+    var bd=-1, bp=null;
+    for (var si=0; si<samp.length; si++) {
+      // dist to nearest already chosen device
+      var md = Infinity;
+      for (var j=0; j<chosen.length; j++) { var dd=hDist(samp[si],chosen[j]); if(dd<md)md=dd; }
+      // multiply by shore-distance weight so deep points beat edge points at equal spacing
+      var w2 = (shoreDists[si]/maxD);
+      var sc2 = md * (0.5 + 0.5*w2); // blend: spread + shore-depth
+      if (sc2 > bd) { bd=sc2; bp=samp[si]; }
+    }
+    chosen.push(bp);
+  }
+  return chosen;
+}
+
+/* ── OPTIMIZATION ─────────────────────────────────────────────────────────── */
+document.getElementById('btnOpt').addEventListener('click', function(){
+  var n   = parseInt(document.getElementById('numDev').value)||1;
+  var rBfV= parseFloat(document.getElementById('rBf').value)||100;
+  var rAlV= parseFloat(document.getElementById('rAl').value)||400;
+  document.getElementById('btnOpt').disabled=true;
+  document.getElementById('prog').classList.add('on');
+  document.getElementById('resPanel').classList.remove('on');
+  sigImg=null; optDevs=[];
+
+  var samp = sampleIn(1400);
+  if (samp.length < 10) {
+    alert('Too few interior samples — make sure the polygon encloses a visible area.');
+    document.getElementById('btnOpt').disabled=false;
+    document.getElementById('prog').classList.remove('on');
+    return;
+  }
+  setProgress(5,'Sampling & measuring shore distances…');
+
+  setTimeout(function(){
+    // Pre-compute shore distances for all sample points
+    var shoreDists = samp.map(function(p){ return shoreDistM(p); });
+    var maxShoreD  = Math.max.apply(null, shoreDists);
+
+    // Minimum shore clearance: device must be at least 5% of algae radius from shore
+    var minClearance = rAlV * 0.05;
+
+    // Filter samples valid for device placement (deep enough)
+    var deepSamp = samp.filter(function(p,i){ return shoreDists[i] >= minClearance; });
+    if (deepSamp.length < n) deepSamp = samp; // fallback
+
+    setProgress(12,'Computing medial axis…');
+
+    setTimeout(function(){
+      var devs = initDivWeighted(n, deepSamp,
+        deepSamp.map(function(p){ return shoreDistM(p); }));
+      setProgress(18,'Initial placement set…');
+
+      var ITER = 350;
+      var rf   = cen(lakePts);
+      var best = score(devs, samp, rAlV, 0.4, maxShoreD);
+      var iter = 0;
+
+      function step(){
+        if (iter >= ITER) { fin(devs, rBfV, rAlV, samp); return; }
+        if (iter%30===0) setProgress(18+Math.round(iter/ITER*72),'Optimizing… '+iter+'/'+ITER);
+
+        // alpha: strong shore-centering bias early, pure coverage later
+        var alpha = iter < ITER*0.6 ? 0.4*(1 - iter/(ITER*0.6)) : 0;
+
+        for (var di=0; di<devs.length; di++) {
+          var dm = toM(devs[di][0],devs[di][1],rf[0],rf[1]);
+          var sz = rAlV*(0.30*(1-iter/ITER)+0.03);
+
+          // 8 cardinal + 8 diagonal directions = 16 candidates per device per step
+          var dirs=[];
+          for(var a=0;a<8;a++){
+            var ang=a*Math.PI/4;
+            dirs.push([dm[0]+sz*Math.cos(ang), dm[1]+sz*Math.sin(ang)]);
+          }
+          // Also try moving toward the local deepest neighbour (gradient toward centre)
+          var localDeep=-1, localDeepPt=null;
+          for(var si=0;si<samp.length;si+=4){
+            var dd2=shoreDists[si];
+            var dm2=toM(samp[si][0],samp[si][1],rf[0],rf[1]);
+            var dx2=dm2[0]-dm[0],dy2=dm2[1]-dm[1];
+            var dist=Math.sqrt(dx2*dx2+dy2*dy2);
+            if(dist<sz*3 && dd2>localDeep){ localDeep=dd2; localDeepPt=[dm[0]+dx2*0.4,dm[1]+dy2*0.4]; }
+          }
+          if(localDeepPt) dirs.push(localDeepPt);
+
+          for (var ci=0; ci<dirs.length; ci++) {
+            var cand = fromM(dirs[ci][0], dirs[ci][1], rf[0], rf[1]);
+            if (!pip(cand[0],cand[1],lakePts)) continue;
+            var inI=false;
+            for(var k=0;k<islands.length;k++){if(islands[k].closed&&pip(cand[0],cand[1],islands[k].pts)){inI=true;break;}}
+            if(inI) continue;
+            // Enforce minimum shore clearance
+            if(shoreDistM(cand) < minClearance) continue;
+            var td=devs.slice(); td[di]=cand;
+            var sc=score(td,samp,rAlV,alpha,maxShoreD);
+            if(sc>best){ best=sc; devs=td; }
+          }
+        }
+        iter++;
+        if(iter%8===0) setTimeout(step,0); else step();
+      }
+      setTimeout(step,20);
+    },20);
+  },20);
+});
+
+function fin(devs,rBfV,rAlV,samp){
+  setProgress(92,'Building signal map…'); optDevs=devs;
+  setTimeout(function(){
+    buildSigMap(); renderOverlay();
+    var cA=covPct(devs,samp,rAlV)*100, cB=covPct(devs,samp,rBfV)*100;
+    var area=polyArea(lakePts);
+    setProgress(100,'Complete!');
+    setTimeout(function(){
+      document.getElementById('prog').classList.remove('on');
+      showResults(devs,cA,cB,area);
+      setStatus('Optimized — '+devs.length+' emitters · algae '+cA.toFixed(1)+'% · biofilm '+cB.toFixed(1)+'%');
+      document.getElementById('btnOpt').disabled=false;
+    },150);
+  },20);
+}
+
+/* ── UNITS ────────────────────────────────────────────────────────────────── */
+var useMetric = true;
+document.getElementById('unitToggle').addEventListener('change', function(){
+  useMetric = this.value === 'metric';
+  var areaEl = document.getElementById('lakeAreaDisplay');
+  if (areaEl && areaEl.dataset.m2) refreshAreaDisplay(+areaEl.dataset.m2);
+  // refresh results panel if open
+  var sv = document.querySelector('#statsBlock .area-val');
+  if (sv && sv.dataset.m2) sv.textContent = formatArea(+sv.dataset.m2);
+});
+
+function formatArea(m2){
+  if(useMetric){
+    if(m2>=1e6) return (m2/1e6).toFixed(3)+' km²';
+    return (m2/1e4).toFixed(2)+' ha';
+  } else {
+    var acres = m2/4046.856;
+    if(acres>=640) return (acres/640).toFixed(3)+' mi²';
+    if(acres>=1)   return acres.toFixed(2)+' acres';
+    return (m2*10.7639).toFixed(0)+' ft²';
+  }
+}
+
+function refreshAreaDisplay(m2){
+  var el=document.getElementById('lakeAreaDisplay');
+  if(!el) return;
+  el.dataset.m2 = m2;
+  el.textContent = formatArea(m2);
+}
+
+function showResults(devs,cA,cB,area){
+  document.getElementById('resPanel').classList.add('on');
+  var areaStr = formatArea(area);
+  document.getElementById('statsBlock').innerHTML=
+    '<div class="sr"><span class="sl">Algae coverage</span><span class="sv">'+cA.toFixed(1)+'%</span></div>'+
+    '<div class="cvbar"><div class="cvfill" style="width:'+Math.min(cA,100)+'%"></div></div>'+
+    '<div class="sr"><span class="sl">Biofilm coverage</span><span class="sv">'+cB.toFixed(1)+'%</span></div>'+
+    '<div class="sr"><span class="sl">Lake area</span><span class="sv area-val" data-m2="'+area+'">'+areaStr+'</span></div>'+
+    '<div class="sr"><span class="sl">Devices placed</span><span class="sv">'+devs.length+'</span></div>';
+  var list=document.getElementById('rlist'); list.innerHTML='';
+  var csv=['ID,Latitude,Longitude'];
+  devs.forEach(function(d,i){
+    csv.push('Emitter '+(i+1)+','+d[0].toFixed(8)+','+d[1].toFixed(8));
+    var c=document.createElement('div'); c.className='rcard';
+    c.innerHTML='<div class="rcard-h"><span class="rcard-id">◉ EMITTER '+(i+1)+'</span><button class="cp">Copy</button></div>'+
+      '<div class="rcard-c">LAT: '+d[0].toFixed(8)+'<br>LNG: '+d[1].toFixed(8)+'</div>';
+    (function(pos,btn){
+      btn.addEventListener('click',function(e){
+        e.stopPropagation();
+        navigator.clipboard.writeText(pos[0].toFixed(8)+', '+pos[1].toFixed(8));
+        btn.textContent='✓ Copied'; setTimeout(function(){btn.textContent='Copy';},1400);
+      });
+      c.addEventListener('click',function(){
+        lmap.setView([pos[0],pos[1]],16);
+        sigImg=null; buildSigMap(); renderOverlay();
+      });
+    })(d, c.querySelector('.cp'));
+    list.appendChild(c);
+  });
+  document.getElementById('coordsTa').value=csv.join('\n');
+  // Update area display in boundary panel too
+  refreshAreaDisplay(area);
+}
+
+document.getElementById('btnExp').addEventListener('click',function(){
+  var rows=['ID,Latitude,Longitude'];
+  optDevs.forEach(function(d,i){rows.push('Emitter '+(i+1)+','+d[0].toFixed(8)+','+d[1].toFixed(8));});
+  var b=new Blob([rows.join('\n')],{type:'text/csv'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='sonicpure_emitters.csv'; a.click();
+});
+
+function setStatus(t){ document.getElementById('statusText').textContent=t; }
+function setProgress(p,t){ document.getElementById('progBar').style.width=p+'%'; document.getElementById('progTxt').textContent=t; }
+
+/* ── ZONE VISIBILITY TOGGLES ─────────────────────────────────────────────── */
+document.getElementById('togAlgae').addEventListener('click', function(){
+  showAlgae = !showAlgae;
+  this.classList.toggle('off', !showAlgae);
+  var badge = document.getElementById('badgeAlgae');
+  badge.textContent = showAlgae ? 'ON' : 'OFF';
+  badge.classList.toggle('off-badge', !showAlgae);
+  renderOverlay();
+});
+document.getElementById('togBiofilm').addEventListener('click', function(){
+  showBiofilm = !showBiofilm;
+  this.classList.toggle('off', !showBiofilm);
+  var badge = document.getElementById('badgeBiofilm');
+  badge.textContent = showBiofilm ? 'ON' : 'OFF';
+  badge.classList.toggle('off-badge', !showBiofilm);
+  renderOverlay();
+});
+
+/* ── INIT ─────────────────────────────────────────────────────────────────── */
+// Leaflet built-in scale bar
+L.control.scale({position:'bottomleft', imperial:true, metric:true}).addTo(lmap);
+
+requestAnimationFrame(function(){
+  requestAnimationFrame(function(){
+    resizeCvs();
+  });
+});
+
+}); // DOMContentLoaded
+</script>
+</body>
+</html>
